@@ -525,6 +525,11 @@ const soundState = {
   context: null
 };
 
+const world3dState = {
+  worlds: new Set(),
+  frame: null
+};
+
 const directionOrder = ["N", "E", "S", "W"];
 const directionDelta = {
   N: { x: 0, y: -1 },
@@ -677,6 +682,7 @@ function renderReference(mission) {
 }
 
 function renderBoard(targetBoard, mission, actor) {
+  disposeWorld3d(targetBoard);
   targetBoard.innerHTML = "";
   targetBoard.dataset.theme = getMissionTheme(mission);
   targetBoard.classList.toggle("pattern-board", mission.type === "pattern");
@@ -699,6 +705,7 @@ function renderBoard(targetBoard, mission, actor) {
   } else {
     placePatternScene(targetBoard, mission);
   }
+  createWorld3d(targetBoard, mission, actor);
 }
 
 function placeActor(targetBoard, actor) {
@@ -784,6 +791,275 @@ function getMissionTrail(mission) {
   return trail;
 }
 
+function createWorld3d(targetBoard, mission, actor) {
+  if (!window.THREE) {
+    targetBoard.classList.remove("has-3d");
+    return;
+  }
+
+  const THREE = window.THREE;
+  const canvas = document.createElement("canvas");
+  canvas.className = "world3d-canvas";
+  canvas.setAttribute("aria-hidden", "true");
+  targetBoard.prepend(canvas);
+
+  const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true, preserveDrawingBuffer: true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.setClearColor(0x000000, 0);
+
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(36, 1, 0.1, 100);
+  camera.position.set(3.8, 5.8, 6.8);
+  camera.lookAt(0, 0, 0);
+
+  const ambient = new THREE.HemisphereLight(0xffffff, 0x76b487, 1.3);
+  scene.add(ambient);
+  const sun = new THREE.DirectionalLight(0xffffff, 1.1);
+  sun.position.set(-3.5, 8, 4.5);
+  scene.add(sun);
+
+  const themeColors = getThemeColors(getMissionTheme(mission));
+  scene.add(createSkyPlane(THREE, themeColors));
+  scene.add(createGround(THREE, themeColors));
+
+  const trail = getMissionTrail(mission);
+  for (let y = 0; y < 5; y += 1) {
+    for (let x = 0; x < 5; x += 1) {
+      const point = { x, y };
+      const tile = createTile3d(THREE, themeColors, {
+        trail: trail.some((tilePoint) => samePoint(tilePoint, point)),
+        start: mission.start && samePoint(mission.start, point),
+        goal: mission.goal && samePoint(mission.goal, point),
+        obstacle: (mission.obstacles || []).some((obstacle) => samePoint(obstacle, point))
+      });
+      tile.position.copy(cellToWorld(point));
+      scene.add(tile);
+    }
+  }
+
+  const actorGroup = createChaea3d(THREE);
+  actorGroup.position.copy(cellToWorld(getInitialActor(mission)));
+  actorGroup.position.y = 0.42;
+  scene.add(actorGroup);
+
+  const patternCubes = [];
+  if (mission.type === "pattern") {
+    (mission.expected || []).forEach((blockId, index, list) => {
+      const cube = createPatternCube3d(THREE, blocks[blockId].kind);
+      cube.position.set((index - (list.length - 1) / 2) * 0.42, 0.3, 1.3);
+      scene.add(cube);
+      patternCubes.push(cube);
+    });
+    actorGroup.position.set(0, 0.52, -0.22);
+  }
+
+  const world = {
+    targetBoard,
+    mission,
+    actorGroup,
+    camera,
+    renderer,
+    scene,
+    canvas,
+    patternCubes,
+    size: { width: 0, height: 0 },
+    targetPosition: actorGroup.position.clone(),
+    targetDirection: actor?.dir || "N",
+    baseY: actorGroup.position.y,
+    disposed: false
+  };
+
+  targetBoard._world3d = world;
+  targetBoard.classList.add("has-3d");
+  world3dState.worlds.add(world);
+  resizeWorld3d(world);
+  if (mission.type === "path") {
+    updateWorld3d(targetBoard, actor || getInitialActor(mission), false);
+  } else {
+    renderWorld3d(world, performance.now());
+  }
+  startWorld3dLoop();
+}
+
+function getThemeColors(theme) {
+  const themes = {
+    meadow: { sky: 0x8fdfff, ground: 0x6ed198, tile: 0xeafff0, trail: 0xffdf6e, start: 0x9fc9ff, goal: 0xb6efc8, obstacle: 0xb7c6cf },
+    city: { sky: 0x8fd8ff, ground: 0x5fd0bb, tile: 0xeaf7ff, trail: 0xffd36e, start: 0x9fc9ff, goal: 0xffcb67, obstacle: 0xaeb8c2 },
+    space: { sky: 0x2e3d92, ground: 0x5b4bb0, tile: 0xdfe9ff, trail: 0x9ef2ff, start: 0x9fc9ff, goal: 0xb78cff, obstacle: 0x8490b8 },
+    play: { sky: 0x8fdfff, ground: 0xa9e66f, tile: 0xf4ffef, trail: 0xffdf6e, start: 0x9fc9ff, goal: 0xffcb67, obstacle: 0xb7c6cf }
+  };
+  return themes[theme] || themes.meadow;
+}
+
+function createSkyPlane(THREE, colors) {
+  const geometry = new THREE.PlaneGeometry(8, 8);
+  const material = new THREE.MeshBasicMaterial({ color: colors.sky, transparent: true, opacity: 0.55 });
+  const sky = new THREE.Mesh(geometry, material);
+  sky.position.set(0, 2.25, -3.4);
+  return sky;
+}
+
+function createGround(THREE, colors) {
+  const geometry = new THREE.BoxGeometry(6.5, 0.16, 6.5);
+  const material = new THREE.MeshLambertMaterial({ color: colors.ground });
+  const ground = new THREE.Mesh(geometry, material);
+  ground.position.y = -0.12;
+  return ground;
+}
+
+function createTile3d(THREE, colors, flags) {
+  const height = flags.obstacle ? 0.46 : flags.goal || flags.start ? 0.2 : 0.11;
+  const color = flags.obstacle ? colors.obstacle : flags.goal ? colors.goal : flags.start ? colors.start : flags.trail ? colors.trail : colors.tile;
+  const geometry = new THREE.BoxGeometry(0.92, height, 0.92);
+  const material = new THREE.MeshLambertMaterial({ color, transparent: true, opacity: flags.trail || flags.goal || flags.start ? 1 : 0.82 });
+  const tile = new THREE.Mesh(geometry, material);
+  tile.position.y = height / 2;
+  return tile;
+}
+
+function createPatternCube3d(THREE, kind) {
+  const colors = { red: 0xff8a76, blue: 0x70a7ff, yellow: 0xffd86b, green: 0x5fd39a };
+  const group = new THREE.Group();
+  const cube = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.34, 0.34), new THREE.MeshLambertMaterial({ color: colors[kind] || 0xffffff }));
+  cube.position.y = 0.17;
+  group.add(cube);
+  const peg = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 0.035, 18), new THREE.MeshLambertMaterial({ color: 0xffffff, transparent: true, opacity: 0.82 }));
+  peg.position.y = 0.36;
+  group.add(peg);
+  return group;
+}
+
+function createChaea3d(THREE) {
+  const group = new THREE.Group();
+  const hairMaterial = new THREE.MeshLambertMaterial({ color: 0x382626 });
+  const skinMaterial = new THREE.MeshLambertMaterial({ color: 0xffd0a8 });
+  const dressMaterial = new THREE.MeshLambertMaterial({ color: 0xff8ab1 });
+  const shoeMaterial = new THREE.MeshLambertMaterial({ color: 0x5d4a56 });
+  const arrowMaterial = new THREE.MeshLambertMaterial({ color: 0x2f8dff });
+
+  const hair = new THREE.Mesh(new THREE.SphereGeometry(0.28, 24, 18), hairMaterial);
+  hair.scale.set(1.08, 1.05, 0.9);
+  hair.position.set(0, 0.82, -0.02);
+  group.add(hair);
+
+  const face = new THREE.Mesh(new THREE.SphereGeometry(0.23, 24, 18), skinMaterial);
+  face.scale.set(1, 0.96, 0.82);
+  face.position.set(0, 0.8, 0.1);
+  group.add(face);
+
+  const eyeMaterial = new THREE.MeshBasicMaterial({ color: 0x263645 });
+  [-0.08, 0.08].forEach((x) => {
+    const eye = new THREE.Mesh(new THREE.SphereGeometry(0.025, 12, 8), eyeMaterial);
+    eye.position.set(x, 0.83, 0.29);
+    group.add(eye);
+  });
+
+  const body = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.42, 0.24), dressMaterial);
+  body.position.set(0, 0.38, 0);
+  group.add(body);
+
+  [-0.08, 0.08].forEach((x) => {
+    const leg = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.18, 0.08), skinMaterial);
+    leg.position.set(x, 0.08, 0);
+    group.add(leg);
+    const shoe = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.05, 0.12), shoeMaterial);
+    shoe.position.set(x, -0.03, 0.03);
+    group.add(shoe);
+  });
+
+  const arrow = new THREE.Group();
+  const cone = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.3, 3), arrowMaterial);
+  cone.rotation.x = Math.PI / 2;
+  cone.position.z = 0.16;
+  arrow.add(cone);
+  arrow.position.set(0, 1.24, 0);
+  arrow.name = "directionArrow";
+  group.add(arrow);
+
+  group.scale.setScalar(0.78);
+  return group;
+}
+
+function cellToWorld(point) {
+  return new window.THREE.Vector3((point.x - 2) * 1.08, 0, (point.y - 2) * 1.08);
+}
+
+function updateWorld3d(targetBoard, actor, animate = true) {
+  const world = targetBoard._world3d;
+  if (!world || !actor) return;
+  const target = cellToWorld(actor);
+  target.y = world.baseY;
+  world.targetPosition.copy(target);
+  world.targetDirection = actor.dir || world.targetDirection;
+  if (!animate) {
+    world.actorGroup.position.copy(world.targetPosition);
+    setChaeaDirection(world.actorGroup, world.targetDirection);
+  }
+  renderWorld3d(world, performance.now());
+}
+
+function setChaeaDirection(group, dir) {
+  const angle = { N: Math.PI, E: Math.PI / 2, S: 0, W: -Math.PI / 2 }[dir] || 0;
+  const arrow = group.getObjectByName("directionArrow");
+  if (arrow) arrow.rotation.y = angle;
+}
+
+function resizeWorld3d(world) {
+  const rect = world.targetBoard.getBoundingClientRect();
+  const width = Math.max(1, Math.round(rect.width));
+  const height = Math.max(1, Math.round(rect.height));
+  if (width === world.size.width && height === world.size.height) return;
+  world.size = { width, height };
+  world.renderer.setSize(width, height, false);
+  world.camera.aspect = width / height;
+  world.camera.updateProjectionMatrix();
+}
+
+function startWorld3dLoop() {
+  if (world3dState.frame) return;
+  const tick = (time) => {
+    world3dState.frame = null;
+    world3dState.worlds.forEach((world) => renderWorld3d(world, time));
+    if (world3dState.worlds.size) {
+      world3dState.frame = window.requestAnimationFrame(tick);
+    }
+  };
+  world3dState.frame = window.requestAnimationFrame(tick);
+}
+
+function renderWorld3d(world, time) {
+  if (world.disposed) return;
+  resizeWorld3d(world);
+  world.actorGroup.position.lerp(world.targetPosition, 0.16);
+  world.actorGroup.position.y = world.baseY + Math.sin(time / 360) * 0.035;
+  setChaeaDirection(world.actorGroup, world.targetDirection);
+  world.patternCubes.forEach((cube, index) => {
+    cube.rotation.y += 0.01 + index * 0.001;
+    cube.position.y = 0.3 + Math.sin(time / 420 + index) * 0.025;
+  });
+  world.renderer.render(world.scene, world.camera);
+}
+
+function disposeWorld3d(targetBoard) {
+  const world = targetBoard._world3d;
+  if (!world) return;
+  world.disposed = true;
+  world3dState.worlds.delete(world);
+  world.scene.traverse((object) => {
+    if (object.geometry) object.geometry.dispose();
+    if (object.material) {
+      if (Array.isArray(object.material)) {
+        object.material.forEach((material) => material.dispose());
+      } else {
+        object.material.dispose();
+      }
+    }
+  });
+  world.renderer.dispose();
+  targetBoard.classList.remove("has-3d");
+  targetBoard._world3d = null;
+}
+
 function updateActorVisual(targetBoard, actor, animate = true) {
   const actorNode = targetBoard.querySelector(".actor");
   const cell = targetBoard.querySelector(`[data-x="${actor.x}"][data-y="${actor.y}"]`);
@@ -800,6 +1076,7 @@ function updateActorVisual(targetBoard, actor, animate = true) {
   actorNode.style.height = `${size}px`;
   actorNode.style.left = `${cellBox.left - boardBox.left + (cellBox.width - size) / 2}px`;
   actorNode.style.top = `${cellBox.top - boardBox.top + (cellBox.height - size) / 2}px`;
+  updateWorld3d(targetBoard, actor, animate);
 }
 
 function bumpActor(targetBoard) {
