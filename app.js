@@ -65,7 +65,7 @@ const missions = [
     id: "age4-forward-one",
     level: "age4",
     title: "앞으로 한 칸",
-    prompt: "캐릭터가 집까지 한 칸 앞으로 가요.",
+    prompt: "채아가 집까지 한 칸 앞으로 가요.",
     type: "path",
     available: ["move", "stop"],
     solution: ["move"],
@@ -84,7 +84,7 @@ const missions = [
     solution: ["move", "move"],
     start: { x: 0, y: 3, dir: "E" },
     goal: { x: 2, y: 3 },
-    hints: ["앞으로를 두 번 놓아요.", "첫 블록이 끝나면 다음 블록을 해요.", "캐릭터가 집에서 멈추면 성공이에요."],
+    hints: ["앞으로를 두 번 놓아요.", "첫 블록이 끝나면 다음 블록을 해요.", "채아가 집에서 멈추면 성공이에요."],
     tags: ["순차", "앞으로"]
   },
   {
@@ -112,7 +112,7 @@ const missions = [
     start: { x: 2, y: 2, dir: "E" },
     goal: { x: 2, y: 2 },
     mustInclude: ["stop"],
-    hints: ["오른쪽 블록을 먼저 놓아요.", "돌아본 뒤 멈춰요.", "캐릭터 머리가 어디를 보는지 봐요."],
+    hints: ["오른쪽 블록을 먼저 놓아요.", "돌아본 뒤 멈춰요.", "채아의 방향 표시를 봐요."],
     tags: ["방향", "멈춤"]
   },
   {
@@ -139,7 +139,7 @@ const missions = [
     solution: ["move"],
     start: { x: 2, y: 3, dir: "N" },
     goal: { x: 2, y: 2 },
-    hints: ["캐릭터가 위를 보고 있어요.", "앞으로 하나면 집이에요.", "놓고 해보기를 눌러요."],
+    hints: ["채아가 위쪽을 보고 있어요.", "앞으로 하나면 집이에요.", "놓고 해보기를 눌러요."],
     tags: ["방향", "앞으로"]
   },
   {
@@ -187,7 +187,7 @@ const missions = [
     solution: ["left", "move"],
     start: { x: 2, y: 3, dir: "E" },
     goal: { x: 2, y: 2 },
-    hints: ["처음에는 왼쪽 블록이에요.", "그 다음 앞으로 가요.", "캐릭터 머리 방향을 봐요."],
+    hints: ["처음에는 왼쪽 블록이에요.", "그 다음 앞으로 가요.", "채아의 방향 표시를 봐요."],
     tags: ["방향", "순서"]
   },
   {
@@ -707,7 +707,18 @@ function placeActor(targetBoard, actor) {
   const actorNode = document.createElement("div");
   actorNode.className = "actor no-motion";
   actorNode.dataset.dir = actor.dir;
-  actorNode.innerHTML = '<span class="actor-face"><span></span><span></span></span>';
+  actorNode.setAttribute("aria-label", "이채아 캐릭터");
+  actorNode.innerHTML = `
+    <span class="chaea-hair"></span>
+    <span class="chaea-face">
+      <span class="chaea-eye"></span>
+      <span class="chaea-eye"></span>
+      <span class="chaea-smile"></span>
+    </span>
+    <span class="chaea-body"></span>
+    <span class="chaea-name">채아</span>
+    <span class="actor-pointer" aria-hidden="true"></span>
+  `;
   targetBoard.append(actorNode);
   updateActorVisual(targetBoard, actor, false);
   actorNode.getBoundingClientRect();
@@ -718,7 +729,16 @@ function placePatternScene(targetBoard, mission) {
   const stage = document.createElement("div");
   stage.className = "pattern-scene";
   stage.innerHTML = `
-    <div class="pattern-character"><span></span><span></span></div>
+    <div class="pattern-character" aria-label="이채아">
+      <span class="chaea-hair"></span>
+      <span class="chaea-face">
+        <span class="chaea-eye"></span>
+        <span class="chaea-eye"></span>
+        <span class="chaea-smile"></span>
+      </span>
+      <span class="chaea-body"></span>
+      <span class="chaea-name">채아</span>
+    </div>
     <div class="pattern-gate">
       ${(mission.expected || []).map((blockId) => `<i data-kind="${blocks[blockId].kind}"></i>`).join("")}
     </div>
@@ -774,7 +794,7 @@ function updateActorVisual(targetBoard, actor, animate = true) {
 
   const boardBox = targetBoard.getBoundingClientRect();
   const cellBox = cell.getBoundingClientRect();
-  const size = Math.min(cellBox.width, cellBox.height) * 0.68;
+  const size = Math.min(cellBox.width, cellBox.height) * 0.86;
 
   actorNode.style.width = `${size}px`;
   actorNode.style.height = `${size}px`;
