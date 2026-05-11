@@ -43,7 +43,7 @@ button {
 }
 
 .app-shell {
-  width: min(1180px, calc(100vw - 28px));
+  width: min(1340px, calc(100vw - 24px));
   min-height: calc(100vh - 28px);
   margin: 14px auto;
   display: flex;
@@ -127,7 +127,7 @@ h2 {
 
 #playView.active {
   display: grid;
-  grid-template-columns: minmax(250px, 310px) 1fr;
+  grid-template-columns: minmax(240px, 300px) minmax(0, 1fr);
   gap: 14px;
 }
 
@@ -306,7 +306,7 @@ h2 {
 
 .board-wrap,
 .free-board-shell {
-  min-height: 230px;
+  min-height: 390px;
   display: grid;
   place-items: center;
   padding: 8px;
@@ -319,8 +319,8 @@ h2 {
 
 .board {
   position: relative;
-  width: min(100%, clamp(300px, 31vw, 390px));
-  aspect-ratio: 1 / 1;
+  width: min(100%, clamp(680px, 72vw, 980px));
+  aspect-ratio: 16 / 9;
   display: grid;
   grid-template-columns: repeat(5, 1fr);
   grid-template-rows: repeat(5, 1fr);
@@ -956,7 +956,7 @@ button:focus-visible {
   min-height: calc(100vh - 126px);
   padding: 14px;
   display: grid;
-  grid-template-columns: minmax(260px, 360px) 1fr;
+  grid-template-columns: minmax(250px, 340px) minmax(0, 1fr);
   grid-template-rows: auto auto 1fr auto;
   gap: 12px;
 }
@@ -980,7 +980,7 @@ button:focus-visible {
 }
 
 .free-board {
-  width: min(100%, 520px);
+  width: min(100%, 980px);
 }
 
 .free-program-zone,
@@ -1178,6 +1178,7 @@ button:focus-visible {
 
   #playView.active {
     grid-template-columns: 1fr;
+    align-items: start;
   }
 
   .practice-area {
@@ -1185,6 +1186,41 @@ button:focus-visible {
   }
 
   .mission-panel {
+    min-height: 0;
+  }
+
+  .mission-nav {
+    margin-top: 0;
+  }
+
+  .mission-panel {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(260px, 0.95fr);
+    align-items: start;
+  }
+
+  .mission-topline,
+  .mission-nav {
+    grid-column: 1 / -1;
+  }
+
+  .mission-panel h2,
+  .mission-prompt,
+  .level-tabs {
+    grid-column: 1;
+  }
+
+  .reference-box,
+  .mission-actions,
+  .hint-text {
+    grid-column: 2;
+  }
+
+  .reference-box {
+    grid-row: 2 / span 3;
+  }
+
+  .hint-text {
     min-height: 0;
   }
 
@@ -1233,6 +1269,20 @@ button:focus-visible {
     min-height: 0;
   }
 
+  .mission-panel {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .mission-panel > * {
+    grid-column: auto;
+    grid-row: auto;
+  }
+
+  .hint-text {
+    min-height: 48px;
+  }
+
   .mission-actions,
   .mission-nav,
   .parent-tools {
@@ -1250,8 +1300,15 @@ button:focus-visible {
     font-size: 0.86rem;
   }
 
+  .board-wrap,
+  .free-board-shell {
+    min-height: 280px;
+    padding: 6px;
+  }
+
   .board {
-    width: min(100%, calc(100vw - 52px));
+    width: min(100%, calc(100vw - 44px));
+    aspect-ratio: 16 / 10;
     gap: 5px;
   }
 

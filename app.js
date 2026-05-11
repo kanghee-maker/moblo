@@ -805,21 +805,41 @@ function createWorld3d(targetBoard, mission, actor) {
   const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true, preserveDrawingBuffer: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   renderer.setClearColor(0x000000, 0);
+  if (renderer.shadowMap) {
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  }
+  if ("outputEncoding" in renderer && THREE.sRGBEncoding) {
+    renderer.outputEncoding = THREE.sRGBEncoding;
+  }
 
   const scene = new THREE.Scene();
-  const camera = new THREE.PerspectiveCamera(36, 1, 0.1, 100);
-  camera.position.set(3.8, 5.8, 6.8);
+  const camera = new THREE.PerspectiveCamera(34, 16 / 9, 0.1, 100);
+  camera.position.set(4.9, 5.35, 7.15);
   camera.lookAt(0, 0, 0);
 
-  const ambient = new THREE.HemisphereLight(0xffffff, 0x76b487, 1.3);
+  const ambient = new THREE.HemisphereLight(0xffffff, 0x76b487, 0.95);
   scene.add(ambient);
-  const sun = new THREE.DirectionalLight(0xffffff, 1.1);
-  sun.position.set(-3.5, 8, 4.5);
+  const sun = new THREE.DirectionalLight(0xffffff, 1.15);
+  sun.position.set(-4.5, 8.5, 5.4);
+  sun.castShadow = true;
+  sun.shadow.mapSize.width = 1024;
+  sun.shadow.mapSize.height = 1024;
+  sun.shadow.camera.near = 1;
+  sun.shadow.camera.far = 18;
+  sun.shadow.camera.left = -6.2;
+  sun.shadow.camera.right = 6.2;
+  sun.shadow.camera.top = 6.2;
+  sun.shadow.camera.bottom = -6.2;
+  sun.shadow.bias = -0.0008;
   scene.add(sun);
 
-  const themeColors = getThemeColors(getMissionTheme(mission));
+  const theme = getMissionTheme(mission);
+  const themeColors = getThemeColors(theme);
   scene.add(createSkyPlane(THREE, themeColors));
   scene.add(createGround(THREE, themeColors));
+  scene.add(createBoardFrame3d(THREE));
+  const animatedDecor = addThemeDecorations(THREE, scene, theme);
 
   const trail = getMissionTrail(mission);
   for (let y = 0; y < 5; y += 1) {
@@ -861,6 +881,7 @@ function createWorld3d(targetBoard, mission, actor) {
     scene,
     canvas,
     patternCubes,
+    animatedDecor,
     size: { width: 0, height: 0 },
     targetPosition: actorGroup.position.clone(),
     targetDirection: mission.type === "pattern" ? "S" : actor?.dir || "N",
@@ -891,29 +912,214 @@ function getThemeColors(theme) {
 }
 
 function createSkyPlane(THREE, colors) {
-  const geometry = new THREE.PlaneGeometry(8, 8);
-  const material = new THREE.MeshBasicMaterial({ color: colors.sky, transparent: true, opacity: 0.55 });
+  const geometry = new THREE.PlaneGeometry(12, 8);
+  const material = new THREE.MeshBasicMaterial({ color: colors.sky, transparent: true, opacity: 0.82 });
   const sky = new THREE.Mesh(geometry, material);
-  sky.position.set(0, 2.25, -3.4);
+  sky.position.set(0, 2.35, -3.55);
   return sky;
 }
 
 function createGround(THREE, colors) {
-  const geometry = new THREE.BoxGeometry(6.5, 0.16, 6.5);
+  const geometry = new THREE.BoxGeometry(9.2, 0.16, 6.6);
   const material = new THREE.MeshLambertMaterial({ color: colors.ground });
   const ground = new THREE.Mesh(geometry, material);
   ground.position.y = -0.12;
-  return ground;
+  return enableShadows(ground, false, true);
+}
+
+function createBoardFrame3d(THREE) {
+  const group = new THREE.Group();
+  const material = new THREE.MeshLambertMaterial({ color: 0xffffff, transparent: true, opacity: 0.8 });
+  const longRail = new THREE.BoxGeometry(5.9, 0.12, 0.12);
+  const shortRail = new THREE.BoxGeometry(0.12, 0.12, 5.9);
+  [
+    { geometry: longRail, x: 0, z: -2.82 },
+    { geometry: longRail, x: 0, z: 2.82 },
+    { geometry: shortRail, x: -2.82, z: 0 },
+    { geometry: shortRail, x: 2.82, z: 0 }
+  ].forEach(({ geometry, x, z }) => {
+    const rail = new THREE.Mesh(geometry, material);
+    rail.position.set(x, 0.06, z);
+    group.add(rail);
+  });
+  return enableShadows(group, true, true);
+}
+
+function addThemeDecorations(THREE, scene, theme) {
+  const group = new THREE.Group();
+  const animated = [];
+  const add = (object) => {
+    group.add(object);
+    return object;
+  };
+  const animate = (object, amplitude = 0.04, speed = 900, spin = 0) => {
+    object.userData.baseY = object.position.y;
+    object.userData.amplitude = amplitude;
+    object.userData.speed = speed;
+    object.userData.spin = spin;
+    animated.push(object);
+    add(object);
+  };
+
+  if (theme === "city") {
+    [
+      [-4.05, -3.0, 0.72, 1.25, 0.72, 0x70a7ff],
+      [-3.12, -3.08, 0.62, 1.75, 0.72, 0xff8a76],
+      [3.18, -3.0, 0.7, 1.48, 0.72, 0xffd86b],
+      [4.1, -3.05, 0.74, 1.12, 0.72, 0x7bd6c4]
+    ].forEach((spec) => add(createBuilding3d(THREE, ...spec)));
+    animate(createCloud3d(THREE, -2.2, 2.55, -3.2, 0.9), 0.035, 1200);
+    animate(createCloud3d(THREE, 2.3, 2.35, -3.25, 0.76), 0.03, 1320);
+  } else if (theme === "space") {
+    animate(createPlanet3d(THREE, -3.6, 2.05, -3.0, 0.34, 0xffd86b), 0.06, 1180, 0.003);
+    animate(createPlanet3d(THREE, 3.72, 1.5, -2.85, 0.28, 0x70a7ff), 0.05, 1300, -0.002);
+    [
+      [-4.1, 2.7, -3.1],
+      [-2.8, 3.05, -3.2],
+      [-1.2, 2.62, -3.15],
+      [1.35, 2.95, -3.2],
+      [2.85, 2.42, -3.05],
+      [4.2, 2.78, -3.2]
+    ].forEach(([x, y, z], index) => animate(createStar3d(THREE, x, y, z, index % 2 ? 0.07 : 0.055), 0.045, 820 + index * 90, 0.01));
+  } else {
+    [
+      [-3.8, -1.55, 0.86],
+      [3.72, -1.72, 0.78],
+      [-3.55, 2.05, 0.72],
+      [3.5, 2.0, 0.7]
+    ].forEach((spec) => add(createTree3d(THREE, ...spec)));
+    add(createFlowerPatch3d(THREE, -3.1, 1.2));
+    add(createFlowerPatch3d(THREE, 3.1, 1.05));
+    animate(createCloud3d(THREE, -2.35, 2.55, -3.12, 0.82), 0.035, 1180);
+    animate(createCloud3d(THREE, 2.15, 2.36, -3.25, 0.68), 0.03, 1360);
+    if (theme === "play") {
+      add(createToyStack3d(THREE, -3.85, 0.38));
+      add(createToyStack3d(THREE, 3.85, 0.15));
+    }
+  }
+
+  enableShadows(group, true, true);
+  scene.add(group);
+  return animated;
+}
+
+function createTree3d(THREE, x, z, scale = 1) {
+  const group = new THREE.Group();
+  group.position.set(x, 0, z);
+  group.scale.setScalar(scale);
+  const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.09, 0.42, 10), new THREE.MeshLambertMaterial({ color: 0x8f6745 }));
+  trunk.position.y = 0.2;
+  group.add(trunk);
+  const crownMaterial = new THREE.MeshLambertMaterial({ color: 0x4fbf73 });
+  const crown = new THREE.Mesh(new THREE.SphereGeometry(0.26, 18, 12), crownMaterial);
+  crown.position.y = 0.52;
+  group.add(crown);
+  const crownTop = new THREE.Mesh(new THREE.SphereGeometry(0.19, 18, 12), crownMaterial);
+  crownTop.position.set(0.08, 0.72, 0.01);
+  group.add(crownTop);
+  return group;
+}
+
+function createFlowerPatch3d(THREE, x, z) {
+  const group = new THREE.Group();
+  group.position.set(x, 0, z);
+  const stemMaterial = new THREE.MeshLambertMaterial({ color: 0x49a966 });
+  const petalColors = [0xff8ab1, 0xffd86b, 0x70a7ff];
+  [-0.24, 0, 0.22].forEach((offset, index) => {
+    const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.16, 6), stemMaterial);
+    stem.position.set(offset, 0.08, index % 2 ? 0.08 : -0.04);
+    group.add(stem);
+    const bloom = new THREE.Mesh(new THREE.SphereGeometry(0.055, 10, 8), new THREE.MeshLambertMaterial({ color: petalColors[index] }));
+    bloom.scale.set(1.1, 0.7, 1.1);
+    bloom.position.set(offset, 0.18, index % 2 ? 0.08 : -0.04);
+    group.add(bloom);
+  });
+  return group;
+}
+
+function createCloud3d(THREE, x, y, z, scale = 1) {
+  const group = new THREE.Group();
+  group.position.set(x, y, z);
+  group.scale.setScalar(scale);
+  const material = new THREE.MeshLambertMaterial({ color: 0xffffff, transparent: true, opacity: 0.86 });
+  [
+    [-0.22, 0, 0, 0.18],
+    [0, 0.05, 0, 0.24],
+    [0.25, 0, 0, 0.18]
+  ].forEach(([cx, cy, cz, radius]) => {
+    const puff = new THREE.Mesh(new THREE.SphereGeometry(radius, 18, 12), material);
+    puff.position.set(cx, cy, cz);
+    group.add(puff);
+  });
+  return group;
+}
+
+function createBuilding3d(THREE, x, z, width, height, depth, color) {
+  const group = new THREE.Group();
+  group.position.set(x, 0, z);
+  const body = new THREE.Mesh(new THREE.BoxGeometry(width, height, depth), new THREE.MeshLambertMaterial({ color }));
+  body.position.y = height / 2;
+  group.add(body);
+  const windowMaterial = new THREE.MeshLambertMaterial({ color: 0xfff0a8 });
+  const columns = Math.max(2, Math.floor(width / 0.22));
+  const rows = Math.max(2, Math.floor(height / 0.34));
+  for (let row = 0; row < rows; row += 1) {
+    for (let column = 0; column < columns; column += 1) {
+      const window = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.09, 0.014), windowMaterial);
+      window.position.set((column - (columns - 1) / 2) * 0.18, 0.26 + row * 0.3, depth / 2 + 0.01);
+      group.add(window);
+    }
+  }
+  return group;
+}
+
+function createPlanet3d(THREE, x, y, z, radius, color) {
+  const group = new THREE.Group();
+  group.position.set(x, y, z);
+  const planet = new THREE.Mesh(new THREE.SphereGeometry(radius, 24, 16), new THREE.MeshLambertMaterial({ color }));
+  group.add(planet);
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(radius * 1.28, radius * 0.055, 8, 32), new THREE.MeshLambertMaterial({ color: 0xffffff, transparent: true, opacity: 0.68 }));
+  ring.rotation.set(Math.PI / 2.35, 0.15, -0.25);
+  group.add(ring);
+  return group;
+}
+
+function createStar3d(THREE, x, y, z, size) {
+  const star = new THREE.Mesh(new THREE.OctahedronGeometry(size, 0), new THREE.MeshBasicMaterial({ color: 0xffffff }));
+  star.position.set(x, y, z);
+  return star;
+}
+
+function createToyStack3d(THREE, x, z) {
+  const group = new THREE.Group();
+  group.position.set(x, 0, z);
+  const colors = [0xff8a76, 0x70a7ff, 0xffd86b, 0x5fd39a];
+  colors.forEach((color, index) => {
+    const cube = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.22, 0.28), new THREE.MeshLambertMaterial({ color }));
+    cube.position.set((index % 2) * 0.22 - 0.11, 0.11 + Math.floor(index / 2) * 0.23, 0);
+    cube.rotation.y = index * 0.18;
+    group.add(cube);
+  });
+  return group;
+}
+
+function enableShadows(object, cast = true, receive = true) {
+  object.traverse((child) => {
+    if (!child.isMesh) return;
+    child.castShadow = cast;
+    child.receiveShadow = receive;
+  });
+  return object;
 }
 
 function createTile3d(THREE, colors, flags) {
   const height = flags.obstacle ? 0.46 : flags.goal || flags.start ? 0.2 : 0.11;
   const color = flags.obstacle ? colors.obstacle : flags.goal ? colors.goal : flags.start ? colors.start : flags.trail ? colors.trail : colors.tile;
   const geometry = new THREE.BoxGeometry(0.92, height, 0.92);
-  const material = new THREE.MeshLambertMaterial({ color, transparent: true, opacity: flags.trail || flags.goal || flags.start ? 1 : 0.82 });
+  const material = new THREE.MeshLambertMaterial({ color, transparent: true, opacity: flags.trail || flags.goal || flags.start ? 1 : 0.94 });
   const tile = new THREE.Mesh(geometry, material);
   tile.position.y = height / 2;
-  return tile;
+  return enableShadows(tile, true, true);
 }
 
 function createPatternCube3d(THREE, kind) {
@@ -925,7 +1131,7 @@ function createPatternCube3d(THREE, kind) {
   const peg = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 0.035, 18), new THREE.MeshLambertMaterial({ color: 0xffffff, transparent: true, opacity: 0.82 }));
   peg.position.y = 0.36;
   group.add(peg);
-  return group;
+  return enableShadows(group, true, true);
 }
 
 function createChaea3d(THREE) {
@@ -933,7 +1139,7 @@ function createChaea3d(THREE) {
   const hairMaterial = new THREE.MeshLambertMaterial({ color: 0x382626 });
   const hairShineMaterial = new THREE.MeshLambertMaterial({ color: 0x6a4a3f });
   const skinMaterial = new THREE.MeshLambertMaterial({ color: 0xffd0a8 });
-  const dressMaterial = new THREE.MeshLambertMaterial({ color: 0xff8ab1 });
+  const dressMaterial = new THREE.MeshLambertMaterial({ color: 0xff6fa6 });
   const dressAccentMaterial = new THREE.MeshLambertMaterial({ color: 0xffc7d9 });
   const shoeMaterial = new THREE.MeshLambertMaterial({ color: 0x5d4a56 });
   const cheekMaterial = new THREE.MeshLambertMaterial({ color: 0xff9c9c, transparent: true, opacity: 0.82 });
@@ -1004,8 +1210,8 @@ function createChaea3d(THREE) {
     group.add(shoe);
   });
 
-  group.scale.setScalar(1.22);
-  return group;
+  group.scale.setScalar(1.32);
+  return enableShadows(group, true, true);
 }
 
 function cellToWorld(point) {
@@ -1043,6 +1249,10 @@ function resizeWorld3d(world) {
   world.size = { width, height };
   world.renderer.setSize(width, height, false);
   world.camera.aspect = width / height;
+  const wide = world.camera.aspect > 1.45;
+  world.camera.fov = wide ? 34 : 38;
+  world.camera.position.set(wide ? 4.9 : 4.15, wide ? 5.35 : 5.75, wide ? 7.15 : 6.75);
+  world.camera.lookAt(0, 0.04, 0);
   world.camera.updateProjectionMatrix();
 }
 
@@ -1073,6 +1283,11 @@ function renderWorld3d(world, time) {
     cube.rotation.y += 0.01 + index * 0.001;
     cube.position.y = 0.3 + Math.sin(time / 420 + index) * 0.025;
   });
+  world.animatedDecor.forEach((object, index) => {
+    object.position.y = object.userData.baseY + Math.sin(time / object.userData.speed + index) * object.userData.amplitude;
+    if (object.userData.spin) object.rotation.y += object.userData.spin;
+  });
+  world.camera.lookAt(Math.sin(time / 5200) * 0.07, 0.04, 0);
   world.renderer.render(world.scene, world.camera);
 }
 
