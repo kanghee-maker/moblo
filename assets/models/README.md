@@ -1,7 +1,12 @@
 # 3D model slots
 
 Put GLB files in this folder to replace the built-in shape-based fallback models.
-Then enable the files in `manifest.js`.
+The first-pass generated GLB set is already enabled in `manifest.js`.
+To regenerate the current set, run:
+
+```bash
+node scripts/generate-assets.js
+```
 
 Expected file names:
 
