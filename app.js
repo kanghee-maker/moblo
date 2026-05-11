@@ -498,6 +498,7 @@ const missions = [
 
 const freeMission = {
   type: "path",
+  level: "free",
   available: ["move", "left", "right", "stop", "repeat"],
   start: { x: 2, y: 2, dir: "N" },
   goal: { x: 4, y: 1 },
@@ -543,6 +544,7 @@ const referenceStrip = document.querySelector("#referenceStrip");
 const statusLine = document.querySelector("#statusLine");
 const freeStatusLine = document.querySelector("#freeStatusLine");
 const dragGhost = document.querySelector("#dragGhost");
+const celebration = document.querySelector("#celebration");
 
 document.querySelectorAll(".mode-tab").forEach((button) => {
   button.addEventListener("click", () => switchView(button.dataset.view));
@@ -628,7 +630,7 @@ function renderMission() {
   state.program = [...(mission.prefill || [])];
   state.actor = getInitialActor(mission);
 
-  document.querySelector("#missionStep").textContent = `${levelOptions[state.currentLevel].shortLabel} · ${position + 1}/${total}`;
+  document.querySelector("#missionStep").textContent = `${levelOptions[state.currentLevel].shortLabel.replace(" ", "")} ${position + 1}/${total}`;
   document.querySelector("#missionTitle").textContent = mission.title;
   document.querySelector("#missionPrompt").textContent = mission.prompt;
   document.querySelector("#hintText").textContent = "";
@@ -676,10 +678,14 @@ function renderReference(mission) {
 
 function renderBoard(targetBoard, mission, actor) {
   targetBoard.innerHTML = "";
+  targetBoard.dataset.theme = getMissionTheme(mission);
+  targetBoard.classList.toggle("pattern-board", mission.type === "pattern");
+  const trail = getMissionTrail(mission);
   for (let y = 0; y < 5; y += 1) {
     for (let x = 0; x < 5; x += 1) {
       const cell = document.createElement("div");
       cell.className = "cell path";
+      if (trail.some((point) => samePoint(point, { x, y }))) cell.classList.add("trail");
       if (mission.goal && samePoint(mission.goal, { x, y })) cell.classList.add("goal");
       if (mission.start && samePoint(mission.start, { x, y })) cell.classList.add("start");
       if ((mission.obstacles || []).some((point) => samePoint(point, { x, y }))) cell.classList.add("obstacle");
@@ -690,6 +696,8 @@ function renderBoard(targetBoard, mission, actor) {
   }
   if (mission.type === "path") {
     placeActor(targetBoard, actor);
+  } else {
+    placePatternScene(targetBoard, mission);
   }
 }
 
@@ -699,11 +707,61 @@ function placeActor(targetBoard, actor) {
   const actorNode = document.createElement("div");
   actorNode.className = "actor no-motion";
   actorNode.dataset.dir = actor.dir;
-  actorNode.textContent = "나";
+  actorNode.innerHTML = '<span class="actor-face"><span></span><span></span></span>';
   targetBoard.append(actorNode);
   updateActorVisual(targetBoard, actor, false);
   actorNode.getBoundingClientRect();
   actorNode.classList.remove("no-motion");
+}
+
+function placePatternScene(targetBoard, mission) {
+  const stage = document.createElement("div");
+  stage.className = "pattern-scene";
+  stage.innerHTML = `
+    <div class="pattern-character"><span></span><span></span></div>
+    <div class="pattern-gate">
+      ${(mission.expected || []).map((blockId) => `<i data-kind="${blocks[blockId].kind}"></i>`).join("")}
+    </div>
+  `;
+  targetBoard.append(stage);
+}
+
+function getMissionTheme(mission) {
+  if (mission.level === "age6") return "space";
+  if (mission.level === "age5") return "city";
+  if (mission.level === "free") return "play";
+  return "meadow";
+}
+
+function getMissionTrail(mission) {
+  if (mission.type !== "path" || mission.hideGuide) return [];
+  const actor = getInitialActor(mission);
+  const trail = [{ x: actor.x, y: actor.y }];
+  let lastAction = null;
+
+  for (const blockId of mission.solution || []) {
+    const action = blockId === "repeat" ? lastAction : blockId;
+    if (!action || action === "stop") break;
+    if (action === "left" || action === "right") {
+      const index = directionOrder.indexOf(actor.dir);
+      const nextIndex = action === "left" ? index - 1 : index + 1;
+      actor.dir = directionOrder[(nextIndex + directionOrder.length) % directionOrder.length];
+      lastAction = action;
+      continue;
+    }
+    if (action === "move") {
+      const delta = directionDelta[actor.dir];
+      const next = { x: actor.x + delta.x, y: actor.y + delta.y };
+      if (next.x < 0 || next.x > 4 || next.y < 0 || next.y > 4) break;
+      if ((mission.obstacles || []).some((point) => samePoint(point, next))) break;
+      actor.x = next.x;
+      actor.y = next.y;
+      lastAction = action;
+      trail.push({ x: actor.x, y: actor.y });
+    }
+  }
+
+  return trail;
 }
 
 function updateActorVisual(targetBoard, actor, animate = true) {
@@ -1039,10 +1097,20 @@ function completeMission() {
   renderProgressDots();
   renderParent();
   playSound("success");
+  showCelebration();
   setStatus("해냈어요! 다음 놀이도 해볼까요?", false);
   const area = document.querySelector(".practice-area");
   area.classList.remove("success-pop");
   window.requestAnimationFrame(() => area.classList.add("success-pop"));
+}
+
+function showCelebration() {
+  if (!celebration) return;
+  celebration.classList.remove("show");
+  window.requestAnimationFrame(() => {
+    celebration.classList.add("show");
+    window.setTimeout(() => celebration.classList.remove("show"), 1050);
+  });
 }
 
 function showHint() {
