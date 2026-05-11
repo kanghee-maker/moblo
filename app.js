@@ -724,7 +724,6 @@ function placeActor(targetBoard, actor) {
     </span>
     <span class="chaea-body"></span>
     <span class="chaea-name">채아</span>
-    <span class="actor-pointer" aria-hidden="true"></span>
   `;
   targetBoard.append(actorNode);
   updateActorVisual(targetBoard, actor, false);
@@ -839,7 +838,7 @@ function createWorld3d(targetBoard, mission, actor) {
 
   const actorGroup = createChaea3d(THREE);
   actorGroup.position.copy(cellToWorld(getInitialActor(mission)));
-  actorGroup.position.y = 0.42;
+  actorGroup.position.y = 0.18;
   scene.add(actorGroup);
 
   const patternCubes = [];
@@ -850,7 +849,7 @@ function createWorld3d(targetBoard, mission, actor) {
       scene.add(cube);
       patternCubes.push(cube);
     });
-    actorGroup.position.set(0, 0.52, -0.22);
+    actorGroup.position.set(0, 0.24, -0.22);
   }
 
   const world = {
@@ -864,7 +863,7 @@ function createWorld3d(targetBoard, mission, actor) {
     patternCubes,
     size: { width: 0, height: 0 },
     targetPosition: actorGroup.position.clone(),
-    targetDirection: actor?.dir || "N",
+    targetDirection: mission.type === "pattern" ? "S" : actor?.dir || "N",
     baseY: actorGroup.position.y,
     disposed: false
   };
@@ -932,31 +931,69 @@ function createPatternCube3d(THREE, kind) {
 function createChaea3d(THREE) {
   const group = new THREE.Group();
   const hairMaterial = new THREE.MeshLambertMaterial({ color: 0x382626 });
+  const hairShineMaterial = new THREE.MeshLambertMaterial({ color: 0x6a4a3f });
   const skinMaterial = new THREE.MeshLambertMaterial({ color: 0xffd0a8 });
   const dressMaterial = new THREE.MeshLambertMaterial({ color: 0xff8ab1 });
+  const dressAccentMaterial = new THREE.MeshLambertMaterial({ color: 0xffc7d9 });
   const shoeMaterial = new THREE.MeshLambertMaterial({ color: 0x5d4a56 });
-  const arrowMaterial = new THREE.MeshLambertMaterial({ color: 0x2f8dff });
+  const cheekMaterial = new THREE.MeshLambertMaterial({ color: 0xff9c9c, transparent: true, opacity: 0.82 });
 
-  const hair = new THREE.Mesh(new THREE.SphereGeometry(0.28, 24, 18), hairMaterial);
-  hair.scale.set(1.08, 1.05, 0.9);
-  hair.position.set(0, 0.82, -0.02);
+  const hair = new THREE.Mesh(new THREE.SphereGeometry(0.34, 28, 20), hairMaterial);
+  hair.scale.set(1.08, 1.08, 0.92);
+  hair.position.set(0, 0.86, -0.03);
   group.add(hair);
 
-  const face = new THREE.Mesh(new THREE.SphereGeometry(0.23, 24, 18), skinMaterial);
-  face.scale.set(1, 0.96, 0.82);
-  face.position.set(0, 0.8, 0.1);
+  [-0.28, 0.28].forEach((x) => {
+    const bun = new THREE.Mesh(new THREE.SphereGeometry(0.15, 20, 14), hairMaterial);
+    bun.position.set(x, 0.86, -0.02);
+    group.add(bun);
+  });
+
+  [-0.1, 0.05].forEach((x, index) => {
+    const bang = new THREE.Mesh(new THREE.SphereGeometry(0.08, 14, 10), hairShineMaterial);
+    bang.scale.set(1.2, 0.72, 0.45);
+    bang.position.set(x, 1.02 - index * 0.03, 0.18);
+    group.add(bang);
+  });
+
+  const face = new THREE.Mesh(new THREE.SphereGeometry(0.27, 28, 20), skinMaterial);
+  face.scale.set(1.02, 0.98, 0.86);
+  face.position.set(0, 0.82, 0.13);
   group.add(face);
 
   const eyeMaterial = new THREE.MeshBasicMaterial({ color: 0x263645 });
-  [-0.08, 0.08].forEach((x) => {
-    const eye = new THREE.Mesh(new THREE.SphereGeometry(0.025, 12, 8), eyeMaterial);
-    eye.position.set(x, 0.83, 0.29);
+  [-0.09, 0.09].forEach((x) => {
+    const eye = new THREE.Mesh(new THREE.SphereGeometry(0.032, 12, 8), eyeMaterial);
+    eye.position.set(x, 0.85, 0.35);
     group.add(eye);
   });
 
-  const body = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.42, 0.24), dressMaterial);
-  body.position.set(0, 0.38, 0);
+  [-0.15, 0.15].forEach((x) => {
+    const cheek = new THREE.Mesh(new THREE.SphereGeometry(0.035, 12, 8), cheekMaterial);
+    cheek.scale.set(1.3, 0.75, 0.28);
+    cheek.position.set(x, 0.77, 0.36);
+    group.add(cheek);
+  });
+
+  const smile = new THREE.Mesh(new THREE.TorusGeometry(0.055, 0.008, 8, 20, Math.PI), new THREE.MeshBasicMaterial({ color: 0xb45e67 }));
+  smile.rotation.set(Math.PI, 0, 0);
+  smile.position.set(0, 0.745, 0.365);
+  group.add(smile);
+
+  const body = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.4, 0.24), dressMaterial);
+  body.position.set(0, 0.37, 0);
   group.add(body);
+
+  const collar = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.06, 0.26), dressAccentMaterial);
+  collar.position.set(0, 0.58, 0.02);
+  group.add(collar);
+
+  [-0.28, 0.28].forEach((x) => {
+    const arm = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.28, 0.08), skinMaterial);
+    arm.position.set(x, 0.38, 0.04);
+    arm.rotation.z = x < 0 ? 0.35 : -0.35;
+    group.add(arm);
+  });
 
   [-0.08, 0.08].forEach((x) => {
     const leg = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.18, 0.08), skinMaterial);
@@ -967,16 +1004,7 @@ function createChaea3d(THREE) {
     group.add(shoe);
   });
 
-  const arrow = new THREE.Group();
-  const cone = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.3, 3), arrowMaterial);
-  cone.rotation.x = Math.PI / 2;
-  cone.position.z = 0.16;
-  arrow.add(cone);
-  arrow.position.set(0, 1.24, 0);
-  arrow.name = "directionArrow";
-  group.add(arrow);
-
-  group.scale.setScalar(0.78);
+  group.scale.setScalar(1.22);
   return group;
 }
 
@@ -1000,8 +1028,11 @@ function updateWorld3d(targetBoard, actor, animate = true) {
 
 function setChaeaDirection(group, dir) {
   const angle = { N: Math.PI, E: Math.PI / 2, S: 0, W: -Math.PI / 2 }[dir] || 0;
-  const arrow = group.getObjectByName("directionArrow");
-  if (arrow) arrow.rotation.y = angle;
+  group.userData.targetRotation = angle;
+  if (typeof group.userData.currentRotation !== "number") {
+    group.userData.currentRotation = angle;
+    group.rotation.y = angle;
+  }
 }
 
 function resizeWorld3d(world) {
@@ -1033,6 +1064,11 @@ function renderWorld3d(world, time) {
   world.actorGroup.position.lerp(world.targetPosition, 0.16);
   world.actorGroup.position.y = world.baseY + Math.sin(time / 360) * 0.035;
   setChaeaDirection(world.actorGroup, world.targetDirection);
+  const current = world.actorGroup.userData.currentRotation || 0;
+  const target = world.actorGroup.userData.targetRotation || 0;
+  const delta = Math.atan2(Math.sin(target - current), Math.cos(target - current));
+  world.actorGroup.userData.currentRotation = current + delta * 0.16;
+  world.actorGroup.rotation.y = world.actorGroup.userData.currentRotation;
   world.patternCubes.forEach((cube, index) => {
     cube.rotation.y += 0.01 + index * 0.001;
     cube.position.y = 0.3 + Math.sin(time / 420 + index) * 0.025;

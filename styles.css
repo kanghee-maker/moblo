@@ -517,8 +517,10 @@ h2 {
   filter: drop-shadow(0 8px 12px rgba(78, 69, 98, 0.24));
   transition:
     left 0.42s cubic-bezier(0.22, 0.8, 0.22, 1),
-    top 0.42s cubic-bezier(0.22, 0.8, 0.22, 1);
-  will-change: left, top;
+    top 0.42s cubic-bezier(0.22, 0.8, 0.22, 1),
+    transform 0.28s ease;
+  transform-origin: center center;
+  will-change: left, top, transform;
 }
 
 .actor.no-motion {
@@ -543,6 +545,18 @@ h2 {
   border-radius: 999px;
   background: rgba(41, 64, 77, 0.2);
   filter: blur(2px);
+}
+
+.actor[data-dir="E"] {
+  transform: rotate(90deg);
+}
+
+.actor[data-dir="S"] {
+  transform: rotate(180deg);
+}
+
+.actor[data-dir="W"] {
+  transform: rotate(270deg);
 }
 
 .chaea-hair {
@@ -627,45 +641,6 @@ h2 {
   font-weight: 950;
   line-height: 1;
   box-shadow: 0 3px 8px rgba(50, 83, 101, 0.14);
-}
-
-.actor-pointer {
-  position: absolute;
-  left: calc(50% - 5px);
-  top: -11px;
-  width: 10px;
-  height: 13px;
-  border-radius: 7px 7px 2px 2px;
-  background: #2f8dff;
-  box-shadow:
-    0 0 0 2px rgba(255, 255, 255, 0.9),
-    0 4px 9px rgba(47, 141, 255, 0.3);
-  transform-origin: 50% calc(100% + 11px);
-  transition: transform 0.28s ease;
-}
-
-.actor-pointer::after {
-  content: "";
-  position: absolute;
-  left: 2px;
-  bottom: -5px;
-  width: 0;
-  height: 0;
-  border-left: 3px solid transparent;
-  border-right: 3px solid transparent;
-  border-top: 6px solid #2f8dff;
-}
-
-.actor[data-dir="E"] .actor-pointer {
-  transform: rotate(90deg);
-}
-
-.actor[data-dir="S"] .actor-pointer {
-  transform: rotate(180deg);
-}
-
-.actor[data-dir="W"] .actor-pointer {
-  transform: rotate(270deg);
 }
 
 .pattern-board .cell {
