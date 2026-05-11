@@ -527,7 +527,67 @@ const soundState = {
 
 const world3dState = {
   worlds: new Set(),
-  frame: null
+  frame: null,
+  loaderPromise: null,
+  modelCache: new Map()
+};
+
+const modelAssets3d = {
+  chaea: {
+    url: "./assets/models/chaea.glb",
+    fit: "height",
+    size: 1.35,
+    replace: true
+  },
+  goal: {
+    url: "./assets/models/goal-star.glb",
+    fit: "height",
+    size: 0.58,
+    offset: { y: 0.2 },
+    replace: false
+  },
+  obstacle: {
+    url: "./assets/models/obstacle-rock.glb",
+    fit: "box",
+    size: 0.82,
+    replace: true
+  },
+  tree: {
+    url: "./assets/models/tree.glb",
+    fit: "height",
+    size: 0.95,
+    replace: true
+  },
+  cloud: {
+    url: "./assets/models/cloud.glb",
+    fit: "box",
+    size: 0.72,
+    replace: true
+  },
+  "block-red": {
+    url: "./assets/models/block-red.glb",
+    fit: "box",
+    size: 0.42,
+    replace: true
+  },
+  "block-blue": {
+    url: "./assets/models/block-blue.glb",
+    fit: "box",
+    size: 0.42,
+    replace: true
+  },
+  "block-yellow": {
+    url: "./assets/models/block-yellow.glb",
+    fit: "box",
+    size: 0.42,
+    replace: true
+  },
+  "block-green": {
+    url: "./assets/models/block-green.glb",
+    fit: "box",
+    size: 0.42,
+    replace: true
+  }
 };
 
 const directionOrder = ["N", "E", "S", "W"];
@@ -836,10 +896,11 @@ function createWorld3d(targetBoard, mission, actor) {
 
   const theme = getMissionTheme(mission);
   const themeColors = getThemeColors(theme);
+  const modelSlots = [];
   scene.add(createSkyPlane(THREE, themeColors));
   scene.add(createGround(THREE, themeColors));
   scene.add(createBoardFrame3d(THREE));
-  const animatedDecor = addThemeDecorations(THREE, scene, theme);
+  const animatedDecor = addThemeDecorations(THREE, scene, theme, modelSlots);
 
   const trail = getMissionTrail(mission);
   for (let y = 0; y < 5; y += 1) {
@@ -853,13 +914,16 @@ function createWorld3d(targetBoard, mission, actor) {
       });
       tile.position.copy(cellToWorld(point));
       scene.add(tile);
+      if (tile.userData.modelAsset) modelSlots.push(tile);
     }
   }
 
   const actorGroup = createChaea3d(THREE);
+  actorGroup.userData.modelAsset = "chaea";
   actorGroup.position.copy(cellToWorld(getInitialActor(mission)));
   actorGroup.position.y = 0.18;
   scene.add(actorGroup);
+  modelSlots.push(actorGroup);
 
   const patternCubes = [];
   if (mission.type === "pattern") {
@@ -868,6 +932,7 @@ function createWorld3d(targetBoard, mission, actor) {
       cube.position.set((index - (list.length - 1) / 2) * 0.42, 0.3, 1.3);
       scene.add(cube);
       patternCubes.push(cube);
+      modelSlots.push(cube);
     });
     actorGroup.position.set(0, 0.24, -0.22);
   }
@@ -882,10 +947,13 @@ function createWorld3d(targetBoard, mission, actor) {
     canvas,
     patternCubes,
     animatedDecor,
+    modelSlots,
+    mixers: [],
     size: { width: 0, height: 0 },
     targetPosition: actorGroup.position.clone(),
     targetDirection: mission.type === "pattern" ? "S" : actor?.dir || "N",
     baseY: actorGroup.position.y,
+    lastRenderTime: 0,
     disposed: false
   };
 
@@ -898,6 +966,7 @@ function createWorld3d(targetBoard, mission, actor) {
   } else {
     renderWorld3d(world, performance.now());
   }
+  hydrateWorldModels3d(world);
   startWorld3dLoop();
 }
 
@@ -945,11 +1014,12 @@ function createBoardFrame3d(THREE) {
   return enableShadows(group, true, true);
 }
 
-function addThemeDecorations(THREE, scene, theme) {
+function addThemeDecorations(THREE, scene, theme, modelSlots = []) {
   const group = new THREE.Group();
   const animated = [];
   const add = (object) => {
     group.add(object);
+    if (object.userData.modelAsset) modelSlots.push(object);
     return object;
   };
   const animate = (object, amplitude = 0.04, speed = 900, spin = 0) => {
@@ -1005,6 +1075,7 @@ function addThemeDecorations(THREE, scene, theme) {
 
 function createTree3d(THREE, x, z, scale = 1) {
   const group = new THREE.Group();
+  group.userData.modelAsset = "tree";
   group.position.set(x, 0, z);
   group.scale.setScalar(scale);
   const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.09, 0.42, 10), new THREE.MeshLambertMaterial({ color: 0x8f6745 }));
@@ -1039,6 +1110,7 @@ function createFlowerPatch3d(THREE, x, z) {
 
 function createCloud3d(THREE, x, y, z, scale = 1) {
   const group = new THREE.Group();
+  group.userData.modelAsset = "cloud";
   group.position.set(x, y, z);
   group.scale.setScalar(scale);
   const material = new THREE.MeshLambertMaterial({ color: 0xffffff, transparent: true, opacity: 0.86 });
@@ -1113,18 +1185,23 @@ function enableShadows(object, cast = true, receive = true) {
 }
 
 function createTile3d(THREE, colors, flags) {
+  const group = new THREE.Group();
+  if (flags.goal) group.userData.modelAsset = "goal";
+  if (flags.obstacle) group.userData.modelAsset = "obstacle";
   const height = flags.obstacle ? 0.46 : flags.goal || flags.start ? 0.2 : 0.11;
   const color = flags.obstacle ? colors.obstacle : flags.goal ? colors.goal : flags.start ? colors.start : flags.trail ? colors.trail : colors.tile;
   const geometry = new THREE.BoxGeometry(0.92, height, 0.92);
   const material = new THREE.MeshLambertMaterial({ color, transparent: true, opacity: flags.trail || flags.goal || flags.start ? 1 : 0.94 });
   const tile = new THREE.Mesh(geometry, material);
   tile.position.y = height / 2;
-  return enableShadows(tile, true, true);
+  group.add(tile);
+  return enableShadows(group, true, true);
 }
 
 function createPatternCube3d(THREE, kind) {
   const colors = { red: 0xff8a76, blue: 0x70a7ff, yellow: 0xffd86b, green: 0x5fd39a };
   const group = new THREE.Group();
+  group.userData.modelAsset = `block-${kind}`;
   const cube = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.34, 0.34), new THREE.MeshLambertMaterial({ color: colors[kind] || 0xffffff }));
   cube.position.y = 0.17;
   group.add(cube);
@@ -1214,6 +1291,166 @@ function createChaea3d(THREE) {
   return enableShadows(group, true, true);
 }
 
+function hydrateWorldModels3d(world) {
+  if (!window.THREE) return;
+  getModelManifest3d().then((manifest) => {
+    if (world.disposed) return;
+    const enabledSlots = world.modelSlots.filter((slot) => manifest[slot.userData.modelAsset]);
+    if (!enabledSlots.length) return;
+    ensureModelLoaders3d().then((ready) => {
+      if (!ready || world.disposed) return;
+      enabledSlots.forEach((slot) => {
+        hydrateModelSlot3d(world, slot);
+      });
+    });
+  });
+}
+
+function ensureModelLoaders3d() {
+  if (!window.THREE) return Promise.resolve(false);
+  if (window.THREE.GLTFLoader) return Promise.resolve(true);
+  if (!world3dState.loaderPromise) {
+    world3dState.loaderPromise = loadScript3d("./vendor/GLTFLoader-r128.js")
+      .then(() => loadScript3d("./vendor/SkeletonUtils-r128.js").catch(() => null))
+      .then(() => Boolean(window.THREE && window.THREE.GLTFLoader))
+      .catch(() => false);
+  }
+  return world3dState.loaderPromise;
+}
+
+function loadScript3d(src) {
+  return new Promise((resolve, reject) => {
+    const existing = document.querySelector(`script[src="${src}"]`);
+    if (existing) {
+      resolve();
+      return;
+    }
+    const script = document.createElement("script");
+    script.src = src;
+    script.async = false;
+    script.onload = resolve;
+    script.onerror = reject;
+    document.head.appendChild(script);
+  });
+}
+
+function hydrateModelSlot3d(world, slot) {
+  const assetName = slot.userData.modelAsset;
+  const asset = modelAssets3d[assetName];
+  if (!asset || slot.userData.modelHydrating) return;
+  slot.userData.modelHydrating = true;
+  loadModelAsset3d(window.THREE, assetName, asset).then((loaded) => {
+    slot.userData.modelHydrating = false;
+    if (!loaded || world.disposed) return;
+
+    const model = createModelInstance3d(window.THREE, loaded.scene, asset);
+    if (!model) return;
+
+    if (asset.replace) {
+      [...slot.children].forEach((child) => {
+        slot.remove(child);
+        disposeObject3d(child);
+      });
+    }
+
+    slot.add(model);
+    slot.userData.modelHydrated = true;
+
+    if (loaded.animations.length) {
+      const mixer = new window.THREE.AnimationMixer(model);
+      const action = mixer.clipAction(loaded.animations[0]);
+      action.play();
+      world.mixers.push(mixer);
+    }
+
+    renderWorld3d(world, performance.now());
+  });
+}
+
+function loadModelAsset3d(THREE, assetName, asset) {
+  return getModelManifest3d().then((manifest) => {
+    const manifestEntry = manifest[assetName];
+    if (!manifestEntry) return null;
+    const url = getModelAssetUrl3d(manifestEntry, asset);
+    if (!world3dState.modelCache.has(url)) {
+      const loader = new THREE.GLTFLoader();
+      const promise = new Promise((resolve) => {
+        loader.load(
+          url,
+          (gltf) => resolve({
+            scene: gltf.scene,
+            animations: gltf.animations || []
+          }),
+          undefined,
+          () => resolve(null)
+        );
+      });
+      world3dState.modelCache.set(url, promise);
+    }
+    return world3dState.modelCache.get(url).then((loaded) => {
+      if (!loaded) return null;
+      return { ...loaded, assetName };
+    });
+  });
+}
+
+function getModelManifest3d() {
+  const manifest = window.mobloModelManifest;
+  return Promise.resolve(manifest && typeof manifest === "object" ? manifest : {});
+}
+
+function getModelAssetUrl3d(manifestEntry, asset) {
+  const base = new URL("./assets/models/", document.baseURI);
+  if (typeof manifestEntry === "string") {
+    return new URL(manifestEntry, base).href;
+  }
+  if (manifestEntry && typeof manifestEntry.url === "string") {
+    return new URL(manifestEntry.url, base).href;
+  }
+  return new URL(asset.url, document.baseURI).href;
+}
+
+function createModelInstance3d(THREE, source, asset) {
+  const clone = THREE.SkeletonUtils ? THREE.SkeletonUtils.clone(source) : source.clone(true);
+  const normalized = normalizeModel3d(THREE, clone, asset);
+  if (!normalized) return null;
+  enableShadows(normalized, true, true);
+  return normalized;
+}
+
+function normalizeModel3d(THREE, object, asset) {
+  const box = new THREE.Box3().setFromObject(object);
+  const size = new THREE.Vector3();
+  box.getSize(size);
+  const fitSize = asset.fit === "height" ? size.y : Math.max(size.x, size.y, size.z);
+  if (!Number.isFinite(fitSize) || fitSize <= 0) return null;
+
+  const targetSize = asset.size || 1;
+  object.scale.multiplyScalar(targetSize / fitSize);
+
+  const scaledBox = new THREE.Box3().setFromObject(object);
+  const center = new THREE.Vector3();
+  scaledBox.getCenter(center);
+  const offset = asset.offset || {};
+  object.position.x += (offset.x || 0) - center.x;
+  object.position.y += (offset.y || 0) - scaledBox.min.y;
+  object.position.z += (offset.z || 0) - center.z;
+  object.rotation.y += asset.rotationY || 0;
+  return object;
+}
+
+function disposeObject3d(object) {
+  object.traverse((child) => {
+    if (child.geometry) child.geometry.dispose();
+    if (!child.material) return;
+    if (Array.isArray(child.material)) {
+      child.material.forEach((material) => material.dispose());
+    } else {
+      child.material.dispose();
+    }
+  });
+}
+
 function cellToWorld(point) {
   return new window.THREE.Vector3((point.x - 2) * 1.08, 0, (point.y - 2) * 1.08);
 }
@@ -1270,7 +1507,10 @@ function startWorld3dLoop() {
 
 function renderWorld3d(world, time) {
   if (world.disposed) return;
+  const deltaSeconds = world.lastRenderTime ? Math.min(0.05, Math.max(0, (time - world.lastRenderTime) / 1000)) : 0;
+  world.lastRenderTime = time;
   resizeWorld3d(world);
+  world.mixers.forEach((mixer) => mixer.update(deltaSeconds));
   world.actorGroup.position.lerp(world.targetPosition, 0.16);
   world.actorGroup.position.y = world.baseY + Math.sin(time / 360) * 0.035;
   setChaeaDirection(world.actorGroup, world.targetDirection);
