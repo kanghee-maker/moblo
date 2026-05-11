@@ -195,6 +195,34 @@ h2 {
   border-radius: var(--radius);
 }
 
+.level-tabs {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  padding: 5px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: #f4f9fb;
+}
+
+.level-tab {
+  min-width: 0;
+  min-height: 38px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: #436170;
+  font-size: 0.94rem;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.level-tab.active {
+  color: var(--ink);
+  background: var(--panel);
+  box-shadow: 0 5px 12px rgba(34, 65, 80, 0.12);
+}
+
 .reference-box {
   padding: 10px;
   border: 1px solid #d5e5ed;
@@ -254,6 +282,7 @@ h2 {
 .icon-button:active,
 .ghost-button:active,
 .mode-tab:active,
+.level-tab:active,
 .run-button:active,
 .block:active {
   transform: translateY(1px);
@@ -746,6 +775,13 @@ button:focus-visible {
 .record-state {
   color: #347061;
   font-weight: 900;
+}
+
+.record-level {
+  margin: 0 0 6px;
+  color: var(--muted);
+  font-size: 0.86rem;
+  font-weight: 750;
 }
 
 .parent-tools {
