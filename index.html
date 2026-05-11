@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>모블로 홈 연습</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="app-shell" aria-label="모블로 홈 연습 웹앱">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">집에서 하는</p>
+          <h1>모블로 연습</h1>
+        </div>
+        <nav class="mode-tabs" aria-label="화면 선택">
+          <button class="mode-tab active" data-view="play" type="button">놀이</button>
+          <button class="mode-tab" data-view="free" type="button">자유</button>
+          <button class="mode-tab" data-view="parent" type="button">기록</button>
+        </nav>
+      </header>
+
+      <section class="view active" id="playView" aria-label="오늘의 놀이">
+        <aside class="mission-panel" aria-label="미션">
+          <div class="mission-topline">
+            <span id="missionStep">1 / 12</span>
+            <div class="progress-dots" id="progressDots" aria-hidden="true"></div>
+          </div>
+          <h2 id="missionTitle">미션</h2>
+          <p id="missionPrompt" class="mission-prompt"></p>
+          <div class="reference-box" id="referenceBox" aria-label="따라 놓기 보기">
+            <span>보기</span>
+            <div class="reference-strip" id="referenceStrip"></div>
+          </div>
+          <div class="mission-actions">
+            <button class="icon-button" id="speakButton" type="button" aria-label="소리로 듣기" title="소리로 듣기">소리</button>
+            <button class="ghost-button" id="hintButton" type="button">힌트</button>
+          </div>
+          <p class="hint-text" id="hintText" aria-live="polite"></p>
+          <div class="mission-nav">
+            <button class="ghost-button" id="prevMission" type="button">이전</button>
+            <button class="ghost-button" id="nextMission" type="button">다음</button>
+          </div>
+        </aside>
+
+        <section class="practice-area" aria-label="블록 연습">
+          <div class="board-wrap">
+            <div class="board" id="board" aria-label="움직임 보드"></div>
+          </div>
+
+          <section class="program-zone" aria-label="블록 놓는 곳">
+            <div class="zone-heading">
+              <span>블록 길</span>
+              <div class="zone-buttons">
+                <button class="icon-button" id="undoButton" type="button" aria-label="마지막 블록 빼기" title="마지막 블록 빼기">되돌리기</button>
+                <button class="icon-button" id="clearButton" type="button" aria-label="블록 모두 치우기" title="블록 모두 치우기">치우기</button>
+              </div>
+            </div>
+            <div class="program-strip" id="programStrip" aria-label="놓은 블록"></div>
+          </section>
+
+          <section class="palette-zone" aria-label="사용할 블록">
+            <div class="palette" id="blockPalette"></div>
+            <button class="run-button" id="runButton" type="button" aria-label="블록 실행하기">
+              <span class="run-symbol" aria-hidden="true">▶</span>
+              <span>해보기</span>
+            </button>
+          </section>
+
+          <p class="status-line" id="statusLine" aria-live="polite"></p>
+        </section>
+      </section>
+
+      <section class="view" id="freeView" aria-label="자유롭게 만들기">
+        <section class="free-layout">
+          <div class="free-copy">
+            <h2>자유 만들기</h2>
+            <p>원하는 블록을 놓고 캐릭터를 움직여요.</p>
+          </div>
+          <div class="free-board-shell">
+            <div class="board free-board" id="freeBoard" aria-label="자유 보드"></div>
+          </div>
+          <section class="program-zone free-program-zone" aria-label="자유 블록 길">
+            <div class="zone-heading">
+              <span>블록 길</span>
+              <div class="zone-buttons">
+                <button class="icon-button" id="freeUndoButton" type="button">되돌리기</button>
+                <button class="icon-button" id="freeClearButton" type="button">치우기</button>
+              </div>
+            </div>
+            <div class="program-strip" id="freeProgramStrip"></div>
+          </section>
+          <section class="palette-zone free-palette-zone" aria-label="자유 블록">
+            <div class="palette" id="freePalette"></div>
+            <button class="run-button" id="freeRunButton" type="button">
+              <span class="run-symbol" aria-hidden="true">▶</span>
+              <span>해보기</span>
+            </button>
+          </section>
+          <p class="status-line" id="freeStatusLine" aria-live="polite"></p>
+        </section>
+      </section>
+
+      <section class="view" id="parentView" aria-label="부모 기록">
+        <section class="parent-layout">
+          <div class="parent-summary">
+            <p class="eyebrow">부모 보기</p>
+            <h2>오늘의 연습 기록</h2>
+            <p id="parentSummaryText"></p>
+          </div>
+          <div class="record-grid" id="recordGrid"></div>
+          <div class="parent-tools">
+            <button class="ghost-button" id="resetProgressButton" type="button">기록 초기화</button>
+            <p>개인 복습용 로컬 앱입니다. 기록은 이 기기에만 저장됩니다.</p>
+          </div>
+        </section>
+      </section>
+    </main>
+
+    <div class="drag-ghost" id="dragGhost" aria-hidden="true"></div>
+    <script src="./app.js"></script>
+  </body>
+</html>
