@@ -208,6 +208,10 @@ function switchView(viewName) {
   });
   document.querySelectorAll(".view").forEach((view) => view.classList.remove("active"));
   document.querySelector(`#${viewName}View`).classList.add("active");
+  window.requestAnimationFrame(() => {
+    if (viewName === "play") updateActorVisual(board, state.actor, false);
+    if (viewName === "free") updateActorVisual(freeBoard, state.freeActor, false);
+  });
   if (viewName === "parent") {
     renderParent();
   }
@@ -286,14 +290,47 @@ function renderBoard(targetBoard, mission, actor) {
 function placeActor(targetBoard, actor) {
   const oldActor = targetBoard.querySelector(".actor");
   if (oldActor) oldActor.remove();
-  const cell = targetBoard.querySelector(`[data-x="${actor.x}"][data-y="${actor.y}"]`);
-  if (!cell) return;
   const actorNode = document.createElement("div");
-  actorNode.className = "actor";
+  actorNode.className = "actor no-motion";
   actorNode.dataset.dir = actor.dir;
   actorNode.textContent = "나";
-  cell.append(actorNode);
+  targetBoard.append(actorNode);
+  updateActorVisual(targetBoard, actor, false);
+  actorNode.getBoundingClientRect();
+  actorNode.classList.remove("no-motion");
 }
+
+function updateActorVisual(targetBoard, actor, animate = true) {
+  const actorNode = targetBoard.querySelector(".actor");
+  const cell = targetBoard.querySelector(`[data-x="${actor.x}"][data-y="${actor.y}"]`);
+  if (!actorNode || !cell) return;
+
+  actorNode.dataset.dir = actor.dir;
+  actorNode.classList.toggle("no-motion", !animate);
+
+  const boardBox = targetBoard.getBoundingClientRect();
+  const cellBox = cell.getBoundingClientRect();
+  const size = Math.min(cellBox.width, cellBox.height) * 0.68;
+
+  actorNode.style.width = `${size}px`;
+  actorNode.style.height = `${size}px`;
+  actorNode.style.left = `${cellBox.left - boardBox.left + (cellBox.width - size) / 2}px`;
+  actorNode.style.top = `${cellBox.top - boardBox.top + (cellBox.height - size) / 2}px`;
+}
+
+function bumpActor(targetBoard) {
+  const actorNode = targetBoard.querySelector(".actor");
+  if (!actorNode) return;
+  actorNode.classList.remove("bump");
+  window.requestAnimationFrame(() => actorNode.classList.add("bump"));
+}
+
+window.addEventListener("resize", () => {
+  window.requestAnimationFrame(() => {
+    updateActorVisual(board, state.actor, false);
+    updateActorVisual(freeBoard, state.freeActor, false);
+  });
+});
 
 function renderPalette(targetPalette, available, isFree) {
   targetPalette.innerHTML = "";
@@ -513,6 +550,7 @@ function checkPattern(mission) {
 }
 
 async function executeProgram(mission, program, isFree) {
+  const targetBoard = isFree ? freeBoard : board;
   const actor = getInitialActor(mission);
   let crashed = false;
   let lastAction = null;
@@ -524,31 +562,35 @@ async function executeProgram(mission, program, isFree) {
       continue;
     }
     if (action === "stop") {
-      await pause(260);
+      await pause(180);
       break;
     }
-    applyAction(actor, action, mission, (didCrash) => {
-      crashed = didCrash || crashed;
-    });
+    const step = applyAction(actor, action, mission);
+    crashed = step.crashed || crashed;
     if (["move", "left", "right"].includes(action)) {
       lastAction = action;
     }
-    renderBoard(isFree ? freeBoard : board, mission, actor);
-    await pause(520);
+    if (step.crashed) {
+      bumpActor(targetBoard);
+      await pause(300);
+    } else {
+      updateActorVisual(targetBoard, actor, true);
+      await pause(action === "move" ? 470 : 310);
+    }
   }
 
   return { actor, crashed };
 }
 
-function applyAction(actor, action, mission, onCrash) {
+function applyAction(actor, action, mission) {
   if (action === "left" || action === "right") {
     const index = directionOrder.indexOf(actor.dir);
     const nextIndex = action === "left" ? index - 1 : index + 1;
     actor.dir = directionOrder[(nextIndex + directionOrder.length) % directionOrder.length];
-    return;
+    return { crashed: false };
   }
 
-  if (action !== "move") return;
+  if (action !== "move") return { crashed: false };
 
   const delta = directionDelta[actor.dir];
   const next = { x: actor.x + delta.x, y: actor.y + delta.y };
@@ -556,12 +598,12 @@ function applyAction(actor, action, mission, onCrash) {
   const hitsObstacle = (mission.obstacles || []).some((point) => samePoint(point, next));
 
   if (isOutside || hitsObstacle) {
-    onCrash(true);
-    return;
+    return { crashed: true };
   }
 
   actor.x = next.x;
   actor.y = next.y;
+  return { crashed: false };
 }
 
 function completeMission() {

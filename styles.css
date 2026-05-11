@@ -287,6 +287,7 @@ h2 {
 }
 
 .board {
+  position: relative;
   width: min(100%, clamp(286px, 28vw, 360px));
   aspect-ratio: 1 / 1;
   display: grid;
@@ -356,8 +357,6 @@ h2 {
 .actor {
   position: absolute;
   z-index: 3;
-  width: 68%;
-  height: 68%;
   display: grid;
   place-items: center;
   color: #fff;
@@ -367,7 +366,20 @@ h2 {
   border: 3px solid rgba(255, 255, 255, 0.92);
   border-radius: 50%;
   box-shadow: 0 8px 18px rgba(195, 82, 68, 0.25);
-  transition: transform 0.18s ease;
+  transform-origin: center center;
+  transition:
+    left 0.42s cubic-bezier(0.22, 0.8, 0.22, 1),
+    top 0.42s cubic-bezier(0.22, 0.8, 0.22, 1),
+    transform 0.28s ease;
+  will-change: left, top, transform;
+}
+
+.actor.no-motion {
+  transition: none;
+}
+
+.actor.bump {
+  animation: bump 0.28s ease;
 }
 
 .actor::after {
@@ -391,6 +403,16 @@ h2 {
 
 .actor[data-dir="W"] {
   transform: rotate(270deg);
+}
+
+@keyframes bump {
+  0%,
+  100% {
+    filter: brightness(1);
+  }
+  45% {
+    filter: brightness(1.16);
+  }
 }
 
 .program-zone,
