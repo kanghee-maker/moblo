@@ -536,56 +536,56 @@ const modelAssets3d = {
   chaea: {
     url: "./assets/models/chaea.glb",
     fit: "height",
-    size: 1.35,
+    size: 1.52,
     replace: true
   },
   goal: {
     url: "./assets/models/goal-star.glb",
     fit: "height",
-    size: 0.58,
+    size: 0.72,
     offset: { y: 0.2 },
     replace: false
   },
   obstacle: {
     url: "./assets/models/obstacle-rock.glb",
     fit: "box",
-    size: 0.82,
+    size: 0.95,
     replace: true
   },
   tree: {
     url: "./assets/models/tree.glb",
     fit: "height",
-    size: 0.95,
+    size: 1.08,
     replace: true
   },
   cloud: {
     url: "./assets/models/cloud.glb",
     fit: "box",
-    size: 0.72,
+    size: 0.84,
     replace: true
   },
   "block-red": {
     url: "./assets/models/block-red.glb",
     fit: "box",
-    size: 0.42,
+    size: 0.5,
     replace: true
   },
   "block-blue": {
     url: "./assets/models/block-blue.glb",
     fit: "box",
-    size: 0.42,
+    size: 0.5,
     replace: true
   },
   "block-yellow": {
     url: "./assets/models/block-yellow.glb",
     fit: "box",
-    size: 0.42,
+    size: 0.5,
     replace: true
   },
   "block-green": {
     url: "./assets/models/block-green.glb",
     fit: "box",
-    size: 0.42,
+    size: 0.5,
     replace: true
   }
 };
